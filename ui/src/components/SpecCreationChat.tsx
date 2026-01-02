@@ -5,12 +5,17 @@
  * Handles the 7-phase conversation flow for creating app specifications.
  */
 
-import { useEffect, useRef, useState } from 'react'
-import { Send, X, CheckCircle2, AlertCircle, Wifi, WifiOff, RotateCcw, Loader2, ArrowRight, Zap } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Send, X, CheckCircle2, AlertCircle, Wifi, WifiOff, RotateCcw, Loader2, ArrowRight, Zap, Paperclip } from 'lucide-react'
 import { useSpecChat } from '../hooks/useSpecChat'
 import { ChatMessage } from './ChatMessage'
 import { QuestionOptions } from './QuestionOptions'
 import { TypingIndicator } from './TypingIndicator'
+import type { ImageAttachment } from '../lib/types'
+
+// Image upload validation constants
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/png']
 
 type InitializerStatus = 'idle' | 'starting' | 'error'
 
@@ -34,8 +39,10 @@ export function SpecCreationChat({
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [yoloEnabled, setYoloEnabled] = useState(false)
+  const [pendingAttachments, setPendingAttachments] = useState<ImageAttachment[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const {
     messages,
@@ -76,10 +83,12 @@ export function SpecCreationChat({
 
   const handleSendMessage = () => {
     const trimmed = input.trim()
-    if (!trimmed || isLoading) return
+    // Allow sending if there's text OR attachments
+    if ((!trimmed && pendingAttachments.length === 0) || isLoading) return
 
-    sendMessage(trimmed)
+    sendMessage(trimmed, pendingAttachments.length > 0 ? pendingAttachments : undefined)
     setInput('')
+    setPendingAttachments([]) // Clear attachments after sending
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -92,6 +101,61 @@ export function SpecCreationChat({
   const handleAnswerSubmit = (answers: Record<string, string | string[]>) => {
     sendAnswer(answers)
   }
+
+  // File handling for image attachments
+  const handleFileSelect = useCallback((files: FileList | null) => {
+    if (!files) return
+
+    Array.from(files).forEach((file) => {
+      // Validate file type
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        setError(`Invalid file type: ${file.name}. Only JPEG and PNG are supported.`)
+        return
+      }
+
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE) {
+        setError(`File too large: ${file.name}. Maximum size is 5 MB.`)
+        return
+      }
+
+      // Read and convert to base64
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string
+        // dataUrl is "data:image/png;base64,XXXXXX"
+        const base64Data = dataUrl.split(',')[1]
+
+        const attachment: ImageAttachment = {
+          id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          filename: file.name,
+          mimeType: file.type as 'image/jpeg' | 'image/png',
+          base64Data,
+          previewUrl: dataUrl,
+          size: file.size,
+        }
+
+        setPendingAttachments((prev) => [...prev, attachment])
+      }
+      reader.readAsDataURL(file)
+    })
+  }, [])
+
+  const handleRemoveAttachment = useCallback((id: string) => {
+    setPendingAttachments((prev) => prev.filter((a) => a.id !== id))
+  }, [])
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      handleFileSelect(e.dataTransfer.files)
+    },
+    [handleFileSelect]
+  )
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+  }, [])
 
   // Connection status indicator
   const ConnectionIndicator = () => {
@@ -216,8 +280,62 @@ export function SpecCreationChat({
 
       {/* Input area */}
       {!isComplete && (
-        <div className="p-4 border-t-3 border-[var(--color-neo-border)] bg-white">
+        <div
+          className="p-4 border-t-3 border-[var(--color-neo-border)] bg-white"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
+          {/* Attachment previews */}
+          {pendingAttachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {pendingAttachments.map((attachment) => (
+                <div
+                  key={attachment.id}
+                  className="relative group border-2 border-[var(--color-neo-border)] p-1 bg-white shadow-[2px_2px_0px_rgba(0,0,0,1)]"
+                >
+                  <img
+                    src={attachment.previewUrl}
+                    alt={attachment.filename}
+                    className="w-16 h-16 object-cover"
+                  />
+                  <button
+                    onClick={() => handleRemoveAttachment(attachment.id)}
+                    className="absolute -top-2 -right-2 bg-[var(--color-neo-danger)] text-white rounded-full p-0.5 border-2 border-[var(--color-neo-border)] hover:scale-110 transition-transform"
+                    title="Remove attachment"
+                  >
+                    <X size={12} />
+                  </button>
+                  <span className="text-xs truncate block max-w-16 mt-1 text-center">
+                    {attachment.filename.length > 10
+                      ? `${attachment.filename.substring(0, 7)}...`
+                      : attachment.filename}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex gap-3">
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              multiple
+              onChange={(e) => handleFileSelect(e.target.files)}
+              className="hidden"
+            />
+
+            {/* Attach button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={connectionStatus !== 'connected'}
+              className="neo-btn neo-btn-ghost p-3"
+              title="Attach image (JPEG, PNG - max 5MB)"
+            >
+              <Paperclip size={18} />
+            </button>
+
             <input
               ref={inputRef}
               type="text"
@@ -227,14 +345,20 @@ export function SpecCreationChat({
               placeholder={
                 currentQuestions
                   ? 'Or type a custom response...'
-                  : 'Type your response...'
+                  : pendingAttachments.length > 0
+                    ? 'Add a message with your image(s)...'
+                    : 'Type your response...'
               }
               className="neo-input flex-1"
               disabled={(isLoading && !currentQuestions) || connectionStatus !== 'connected'}
             />
             <button
               onClick={handleSendMessage}
-              disabled={!input.trim() || (isLoading && !currentQuestions) || connectionStatus !== 'connected'}
+              disabled={
+                (!input.trim() && pendingAttachments.length === 0) ||
+                (isLoading && !currentQuestions) ||
+                connectionStatus !== 'connected'
+              }
               className="neo-btn neo-btn-primary px-6"
             >
               <Send size={18} />
@@ -243,7 +367,7 @@ export function SpecCreationChat({
 
           {/* Help text */}
           <p className="text-xs text-[var(--color-neo-text-secondary)] mt-2">
-            Press Enter to send. Claude will guide you through creating your app specification.
+            Press Enter to send. Drag & drop or click <Paperclip size={12} className="inline" /> to attach images (JPEG/PNG, max 5MB).
           </p>
         </div>
       )}

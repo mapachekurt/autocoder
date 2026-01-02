@@ -13,7 +13,7 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
-  const { role, content, timestamp, isStreaming } = message
+  const { role, content, attachments, timestamp, isStreaming } = message
 
   // Format timestamp
   const timeString = timestamp.toLocaleTimeString([], {
@@ -103,38 +103,63 @@ export function ChatMessage({ message }: ChatMessageProps) {
             `}
           >
             {/* Parse content for basic markdown-like formatting */}
-            <div className="whitespace-pre-wrap text-sm leading-relaxed text-[#1a1a1a]">
-              {content.split('\n').map((line, i) => {
-                // Bold text
-                const boldRegex = /\*\*(.*?)\*\*/g
-                const parts = []
-                let lastIndex = 0
-                let match
+            {content && (
+              <div className="whitespace-pre-wrap text-sm leading-relaxed text-[#1a1a1a]">
+                {content.split('\n').map((line, i) => {
+                  // Bold text
+                  const boldRegex = /\*\*(.*?)\*\*/g
+                  const parts = []
+                  let lastIndex = 0
+                  let match
 
-                while ((match = boldRegex.exec(line)) !== null) {
-                  if (match.index > lastIndex) {
-                    parts.push(line.slice(lastIndex, match.index))
+                  while ((match = boldRegex.exec(line)) !== null) {
+                    if (match.index > lastIndex) {
+                      parts.push(line.slice(lastIndex, match.index))
+                    }
+                    parts.push(
+                      <strong key={`bold-${i}-${match.index}`} className="font-bold">
+                        {match[1]}
+                      </strong>
+                    )
+                    lastIndex = match.index + match[0].length
                   }
-                  parts.push(
-                    <strong key={`bold-${i}-${match.index}`} className="font-bold">
-                      {match[1]}
-                    </strong>
+
+                  if (lastIndex < line.length) {
+                    parts.push(line.slice(lastIndex))
+                  }
+
+                  return (
+                    <span key={i}>
+                      {parts.length > 0 ? parts : line}
+                      {i < content.split('\n').length - 1 && '\n'}
+                    </span>
                   )
-                  lastIndex = match.index + match[0].length
-                }
+                })}
+              </div>
+            )}
 
-                if (lastIndex < line.length) {
-                  parts.push(line.slice(lastIndex))
-                }
-
-                return (
-                  <span key={i}>
-                    {parts.length > 0 ? parts : line}
-                    {i < content.split('\n').length - 1 && '\n'}
-                  </span>
-                )
-              })}
-            </div>
+            {/* Display image attachments */}
+            {attachments && attachments.length > 0 && (
+              <div className={`flex flex-wrap gap-2 ${content ? 'mt-3' : ''}`}>
+                {attachments.map((attachment) => (
+                  <div
+                    key={attachment.id}
+                    className="border-2 border-[var(--color-neo-border)] p-1 bg-white shadow-[2px_2px_0px_rgba(0,0,0,1)]"
+                  >
+                    <img
+                      src={attachment.previewUrl}
+                      alt={attachment.filename}
+                      className="max-w-48 max-h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => window.open(attachment.previewUrl, '_blank')}
+                      title={`${attachment.filename} (click to enlarge)`}
+                    />
+                    <span className="text-xs text-[var(--color-neo-text-secondary)] block mt-1 text-center">
+                      {attachment.filename}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Streaming indicator */}
             {isStreaming && (

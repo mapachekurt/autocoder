@@ -13,8 +13,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
+from ..schemas import ImageAttachment
 from ..services.spec_chat_session import (
     SpecChatSession,
     get_session,
@@ -191,7 +192,24 @@ async def spec_chat_websocket(websocket: WebSocket, project_name: str):
                             continue
 
                     user_content = message.get("content", "").strip()
-                    if not user_content:
+
+                    # Parse attachments if present
+                    attachments: list[ImageAttachment] = []
+                    raw_attachments = message.get("attachments", [])
+                    if raw_attachments:
+                        try:
+                            for raw_att in raw_attachments:
+                                attachments.append(ImageAttachment(**raw_att))
+                        except (ValidationError, Exception) as e:
+                            logger.warning(f"Invalid attachment data: {e}")
+                            await websocket.send_json({
+                                "type": "error",
+                                "content": f"Invalid attachment: {str(e)}"
+                            })
+                            continue
+
+                    # Allow empty content if attachments are present
+                    if not user_content and not attachments:
                         await websocket.send_json({
                             "type": "error",
                             "content": "Empty message"
@@ -202,8 +220,8 @@ async def spec_chat_websocket(websocket: WebSocket, project_name: str):
                     spec_complete_received = False
                     spec_path = None
 
-                    # Stream Claude's response
-                    async for chunk in session.send_message(user_content):
+                    # Stream Claude's response (with attachments if present)
+                    async for chunk in session.send_message(user_content, attachments if attachments else None):
                         # Track spec_complete but don't send complete yet
                         if chunk.get("type") == "spec_complete":
                             spec_complete_received = True

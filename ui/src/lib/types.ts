@@ -209,11 +209,22 @@ export type SpecChatServerMessage =
   | SpecChatPongMessage
   | SpecChatResponseDoneMessage
 
+// Image attachment for chat messages
+export interface ImageAttachment {
+  id: string
+  filename: string
+  mimeType: 'image/jpeg' | 'image/png'
+  base64Data: string    // Raw base64 (without data: prefix)
+  previewUrl: string    // data: URL for display
+  size: number          // File size in bytes
+}
+
 // UI chat message for display
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
+  attachments?: ImageAttachment[]
   timestamp: Date
   questions?: SpecQuestion[]
   isStreaming?: boolean

@@ -17,7 +17,27 @@ from typing import AsyncGenerator, Optional
 
 from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
 
+from ..schemas import ImageAttachment
+
 logger = logging.getLogger(__name__)
+
+
+async def _make_multimodal_message(content_blocks: list[dict]) -> AsyncGenerator[dict, None]:
+    """
+    Create an async generator that yields a properly formatted multimodal message.
+
+    The Claude Agent SDK's query() method accepts either:
+    - A string (simple text)
+    - An AsyncIterable[dict] (for custom message formats)
+
+    This function wraps content blocks in the expected message format.
+    """
+    yield {
+        "type": "user",
+        "message": {"role": "user", "content": content_blocks},
+        "parent_tool_use_id": None,
+        "session_id": "default",
+    }
 
 # Root directory of the project
 ROOT_DIR = Path(__file__).parent.parent.parent
@@ -166,12 +186,17 @@ class SpecChatSession:
                 "content": f"Failed to start conversation: {str(e)}"
             }
 
-    async def send_message(self, user_message: str) -> AsyncGenerator[dict, None]:
+    async def send_message(
+        self,
+        user_message: str,
+        attachments: list[ImageAttachment] | None = None
+    ) -> AsyncGenerator[dict, None]:
         """
         Send user message and stream Claude's response.
 
         Args:
             user_message: The user's response
+            attachments: Optional list of image attachments
 
         Yields:
             Message chunks of various types:
@@ -191,11 +216,12 @@ class SpecChatSession:
         self.messages.append({
             "role": "user",
             "content": user_message,
+            "has_attachments": bool(attachments),
             "timestamp": datetime.now().isoformat()
         })
 
         try:
-            async for chunk in self._query_claude(user_message):
+            async for chunk in self._query_claude(user_message, attachments):
                 yield chunk
             # Signal that the response is complete (for UI to hide loading indicator)
             yield {"type": "response_done"}
@@ -206,11 +232,16 @@ class SpecChatSession:
                 "content": f"Error: {str(e)}"
             }
 
-    async def _query_claude(self, message: str) -> AsyncGenerator[dict, None]:
+    async def _query_claude(
+        self,
+        message: str,
+        attachments: list[ImageAttachment] | None = None
+    ) -> AsyncGenerator[dict, None]:
         """
         Internal method to query Claude and stream responses.
 
         Handles tool calls (Write) and text responses.
+        Supports multimodal content with image attachments.
 
         IMPORTANT: Spec creation requires BOTH files to be written:
         1. app_spec.txt - the main specification
@@ -221,8 +252,33 @@ class SpecChatSession:
         if not self.client:
             return
 
-        # Send the message to Claude using the SDK's query method
-        await self.client.query(message)
+        # Build the message content
+        if attachments and len(attachments) > 0:
+            # Multimodal message: build content blocks array
+            content_blocks = []
+
+            # Add text block if there's text
+            if message:
+                content_blocks.append({"type": "text", "text": message})
+
+            # Add image blocks
+            for att in attachments:
+                content_blocks.append({
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": att.mimeType,
+                        "data": att.base64Data,
+                    }
+                })
+
+            # Send multimodal content to Claude using async generator format
+            # The SDK's query() accepts AsyncIterable[dict] for custom message formats
+            await self.client.query(_make_multimodal_message(content_blocks))
+            logger.info(f"Sent multimodal message with {len(attachments)} image(s)")
+        else:
+            # Text-only message: use string format
+            await self.client.query(message)
 
         current_text = ""
 
