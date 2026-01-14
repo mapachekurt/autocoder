@@ -98,6 +98,31 @@ async def run_agent_session(
                             # Tool succeeded - just show brief confirmation
                             print("   [Done]", flush=True)
 
+            # Handle ResultMessage (usage/cost summary)
+            elif msg_type == "ResultMessage":
+                usage = getattr(msg, "usage", {})
+                cost = getattr(msg, "total_cost_usd", None)
+                model = getattr(msg, "model", "unknown")
+
+                if usage:
+                    input_tokens = usage.get("input_tokens", 0)
+                    output_tokens = usage.get("output_tokens", 0)
+
+                    # Record usage in database
+                    from progress import record_usage
+
+                    record_usage(
+                        project_dir,
+                        model,
+                        input_tokens,
+                        output_tokens,
+                        cost,
+                    )
+
+                    print(f"\n[Usage] Input: {input_tokens}, Output: {output_tokens}", flush=True)
+                    if cost:
+                        print(f"        Cost: ${cost:.4f}", flush=True)
+
         print("\n" + "-" * 70 + "\n")
         return "continue", response_text
 

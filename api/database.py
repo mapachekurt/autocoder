@@ -8,10 +8,11 @@ SQLite database schema for feature storage using SQLAlchemy.
 from pathlib import Path
 from typing import Optional
 
-from sqlalchemy import Boolean, Column, Integer, String, Text, create_engine
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.types import JSON
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -41,6 +42,30 @@ class Feature(Base):
             "steps": self.steps,
             "passes": self.passes,
             "in_progress": self.in_progress,
+        }
+
+
+class ProjectUsage(Base):
+    """Tracks project expenditure and token usage."""
+
+    __tablename__ = "project_usage"
+
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    model = Column(String(100))
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    cost_usd = Column(Float, default=0.0)
+
+    def to_dict(self) -> dict:
+        """Convert usage record to dictionary."""
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp.isoformat() + "Z",
+            "model": self.model,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "cost_usd": self.cost_usd,
         }
 
 

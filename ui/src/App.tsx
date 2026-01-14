@@ -194,6 +194,7 @@ function App() {
               total={progress.total}
               percentage={progress.percentage}
               isConnected={wsState.isConnected}
+              expenditure={projects?.find(p => p.name === selectedProject)?.usage.total_cost_usd}
             />
 
             {/* Agent Thought - shows latest agent narrative */}
@@ -204,20 +205,20 @@ function App() {
 
             {/* Initializing Features State - show when agent is running but no features yet */}
             {features &&
-             features.pending.length === 0 &&
-             features.in_progress.length === 0 &&
-             features.done.length === 0 &&
-             wsState.agentStatus === 'running' && (
-              <div className="neo-card p-8 text-center">
-                <Loader2 size={32} className="animate-spin mx-auto mb-4 text-[var(--color-neo-progress)]" />
-                <h3 className="font-display font-bold text-xl mb-2">
-                  Initializing Features...
-                </h3>
-                <p className="text-[var(--color-neo-text-secondary)]">
-                  The agent is reading your spec and creating features. This may take a moment.
-                </p>
-              </div>
-            )}
+              features.pending.length === 0 &&
+              features.in_progress.length === 0 &&
+              features.done.length === 0 &&
+              wsState.agentStatus === 'running' && (
+                <div className="neo-card p-8 text-center">
+                  <Loader2 size={32} className="animate-spin mx-auto mb-4 text-[var(--color-neo-progress)]" />
+                  <h3 className="font-display font-bold text-xl mb-2">
+                    Initializing Features...
+                  </h3>
+                  <p className="text-[var(--color-neo-text-secondary)]">
+                    The agent is reading your spec and creating features. This may take a moment.
+                  </p>
+                </div>
+              )}
 
             {/* Kanban Board */}
             <KanbanBoard

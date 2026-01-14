@@ -36,7 +36,8 @@ from registry import get_project_path
 
 # Configuration
 # DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
-DEFAULT_MODEL = "claude-opus-4-5-20251101"
+# DEFAULT_MODEL = "claude-opus-4-5-20251101"
+DEFAULT_MODEL = "z-ai/glm-4.7"
 
 
 def parse_args() -> argparse.Namespace:

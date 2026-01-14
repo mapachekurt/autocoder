@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 # Patterns for sensitive data that should be redacted from output
 SENSITIVE_PATTERNS = [
     r'sk-[a-zA-Z0-9]{20,}',  # Anthropic API keys
+    r'sk-or-[a-zA-Z0-9-]{20,}',  # OpenRouter API keys
     r'ANTHROPIC_API_KEY=[^\s]+',
     r'api[_-]?key[=:][^\s]+',
     r'token[=:][^\s]+',

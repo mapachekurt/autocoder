@@ -5,6 +5,7 @@ interface ProgressDashboardProps {
   total: number
   percentage: number
   isConnected: boolean
+  expenditure?: number
 }
 
 export function ProgressDashboard({
@@ -12,6 +13,7 @@ export function ProgressDashboard({
   total,
   percentage,
   isConnected,
+  expenditure = 0,
 }: ProgressDashboardProps) {
   return (
     <div className="neo-card p-6">
@@ -69,6 +71,15 @@ export function ProgressDashboard({
           </span>
           <span className="block text-sm text-[var(--color-neo-text-secondary)] uppercase">
             Total
+          </span>
+        </div>
+        <div className="text-4xl text-[var(--color-neo-text-secondary)]">/</div>
+        <div className="min-w-[120px]">
+          <span className="font-mono text-3xl font-bold text-[var(--color-neo-progress)]">
+            ${expenditure.toFixed(2)}
+          </span>
+          <span className="block text-sm text-[var(--color-neo-text-secondary)] uppercase">
+            Cost
           </span>
         </div>
       </div>

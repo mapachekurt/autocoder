@@ -30,12 +30,20 @@ class ProjectStats(BaseModel):
     percentage: float = 0.0
 
 
+class ProjectUsageSummary(BaseModel):
+    """Cumulative usage summary."""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_cost_usd: float = 0.0
+
+
 class ProjectSummary(BaseModel):
     """Summary of a project for list view."""
     name: str
     path: str
     has_spec: bool
     stats: ProjectStats
+    usage: ProjectUsageSummary = ProjectUsageSummary()
 
 
 class ProjectDetail(BaseModel):
@@ -44,6 +52,7 @@ class ProjectDetail(BaseModel):
     path: str
     has_spec: bool
     stats: ProjectStats
+    usage: ProjectUsageSummary = ProjectUsageSummary()
     prompts_dir: str
 
 

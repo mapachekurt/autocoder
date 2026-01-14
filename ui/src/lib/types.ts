@@ -10,11 +10,18 @@ export interface ProjectStats {
   percentage: number
 }
 
+export interface ProjectUsage {
+  input_tokens: number
+  output_tokens: number
+  total_cost_usd: number
+}
+
 export interface ProjectSummary {
   name: string
   path: string
   has_spec: boolean
   stats: ProjectStats
+  usage: ProjectUsage
 }
 
 export interface ProjectDetail extends ProjectSummary {

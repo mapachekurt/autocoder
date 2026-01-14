@@ -221,3 +221,83 @@ def print_progress_summary(project_dir: Path) -> None:
         send_progress_webhook(passing, total, project_dir)
     else:
         print("\nProgress: No features in database yet")
+
+
+def record_usage(
+    project_dir: Path,
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cost_usd: float | None = None,
+) -> None:
+    """Record token usage and cost in the project database."""
+    db_file = project_dir / "features.db"
+    if not db_file.exists():
+        return
+
+    # Fallback cost calculation (GLM 4.7 rates if not provided)
+    if cost_usd is None:
+        if "glm-4.7" in model.lower():
+            # OpenRouter Rate: $0.4 / 1M input, $1.5 / 1M output
+            input_rate = 0.4 / 1_000_000
+            output_rate = 1.5 / 1_000_000
+            cost_usd = (input_tokens * input_rate) + (output_tokens * output_rate)
+        else:
+            cost_usd = 0.0
+
+    try:
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        # Create table if it doesn't exist (safety)
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS project_usage (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME,
+                model TEXT,
+                input_tokens INTEGER,
+                output_tokens INTEGER,
+                cost_usd FLOAT
+            )
+        """
+        )
+        cursor.execute(
+            "INSERT INTO project_usage (timestamp, model, input_tokens, output_tokens, cost_usd) VALUES (?, ?, ?, ?, ?)",
+            (datetime.utcnow().isoformat(), model, input_tokens, output_tokens, cost_usd),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[Database error in record_usage: {e}]")
+
+
+def get_total_usage(project_dir: Path) -> dict:
+    """Get cumulative token usage and cost for a project."""
+    db_file = project_dir / "features.db"
+    if not db_file.exists():
+        return {"input_tokens": 0, "output_tokens": 0, "total_cost_usd": 0.0}
+
+    try:
+        conn = sqlite3.connect(db_file)
+        cursor = conn.cursor()
+        # Check if table exists
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='project_usage'"
+        )
+        if not cursor.fetchone():
+            return {"input_tokens": 0, "output_tokens": 0, "total_cost_usd": 0.0}
+
+        cursor.execute(
+            "SELECT SUM(input_tokens), SUM(output_tokens), SUM(cost_usd) FROM project_usage"
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        return {
+            "input_tokens": row[0] or 0,
+            "output_tokens": row[1] or 0,
+            "total_cost_usd": row[2] or 0.0,
+        }
+    except Exception as e:
+        print(f"[Database error in get_total_usage: {e}]")
+        return {"input_tokens": 0, "output_tokens": 0, "total_cost_usd": 0.0}

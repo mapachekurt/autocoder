@@ -76,21 +76,25 @@ export function ProjectSelector({
                       onSelectProject(project.name)
                       setIsOpen(false)
                     }}
-                    className={`w-full neo-dropdown-item flex items-center justify-between ${
-                      project.name === selectedProject
+                    className={`w-full neo-dropdown-item flex items-center justify-between ${project.name === selectedProject
                         ? 'bg-[var(--color-neo-pending)]'
                         : ''
-                    }`}
+                      }`}
                   >
                     <span className="flex items-center gap-2">
                       <FolderOpen size={16} />
                       {project.name}
                     </span>
-                    {project.stats.total > 0 && (
-                      <span className="text-sm font-mono">
-                        {project.stats.passing}/{project.stats.total}
+                    <div className="flex items-center gap-3">
+                      {project.stats.total > 0 && (
+                        <span className="text-sm font-mono opacity-60">
+                          {project.stats.passing}/{project.stats.total}
+                        </span>
+                      )}
+                      <span className="text-sm font-mono font-bold text-[var(--color-neo-progress)]">
+                        ${project.usage.total_cost_usd.toFixed(2)}
                       </span>
-                    )}
+                    </div>
                   </button>
                 ))}
               </div>

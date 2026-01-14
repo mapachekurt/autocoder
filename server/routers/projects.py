@@ -27,6 +27,7 @@ _check_spec_exists = None
 _scaffold_project_prompts = None
 _get_project_prompts_dir = None
 _count_passing_tests = None
+_get_total_usage = None
 
 
 def _init_imports():
@@ -43,7 +44,7 @@ def _init_imports():
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
-    from progress import count_passing_tests
+    from progress import count_passing_tests, get_total_usage
     from prompts import get_project_prompts_dir, scaffold_project_prompts
     from start import check_spec_exists
 
@@ -51,6 +52,7 @@ def _init_imports():
     _scaffold_project_prompts = scaffold_project_prompts
     _get_project_prompts_dir = get_project_prompts_dir
     _count_passing_tests = count_passing_tests
+    _get_total_usage = get_total_usage
     _imports_initialized = True
 
 
@@ -97,6 +99,12 @@ def get_project_stats(project_dir: Path) -> ProjectStats:
     )
 
 
+def get_project_usage_summary(project_dir: Path) -> dict:
+    """Get usage summary for a project."""
+    _init_imports()
+    return _get_total_usage(project_dir)
+
+
 @router.get("", response_model=list[ProjectSummary])
 async def list_projects():
     """List all registered projects."""
@@ -116,12 +124,14 @@ async def list_projects():
 
         has_spec = _check_spec_exists(project_dir)
         stats = get_project_stats(project_dir)
+        usage = get_project_usage_summary(project_dir)
 
         result.append(ProjectSummary(
             name=name,
             path=info["path"],
             has_spec=has_spec,
             stats=stats,
+            usage=usage,
         ))
 
     return result
@@ -206,6 +216,7 @@ async def get_project(name: str):
 
     has_spec = _check_spec_exists(project_dir)
     stats = get_project_stats(project_dir)
+    usage = get_project_usage_summary(project_dir)
     prompts_dir = _get_project_prompts_dir(project_dir)
 
     return ProjectDetail(
@@ -213,6 +224,7 @@ async def get_project(name: str):
         path=project_dir.as_posix(),
         has_spec=has_spec,
         stats=stats,
+        usage=usage,
         prompts_dir=str(prompts_dir),
     )
 
