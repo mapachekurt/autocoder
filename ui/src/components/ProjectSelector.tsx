@@ -1,13 +1,16 @@
 import { useState } from 'react'
-import { ChevronDown, Plus, FolderOpen, Loader2 } from 'lucide-react'
+import { ChevronDown, Plus, FolderOpen, Loader2, Trash2 } from 'lucide-react'
 import type { ProjectSummary } from '../lib/types'
 import { NewProjectModal } from './NewProjectModal'
+import { ConfirmDialog } from './ConfirmDialog'
+import { useDeleteProject } from '../hooks/useProjects'
 
 interface ProjectSelectorProps {
   projects: ProjectSummary[]
   selectedProject: string | null
   onSelectProject: (name: string | null) => void
   isLoading: boolean
+  onSpecCreatingChange?: (isCreating: boolean) => void
 }
 
 export function ProjectSelector({
@@ -15,13 +18,44 @@ export function ProjectSelector({
   selectedProject,
   onSelectProject,
   isLoading,
+  onSpecCreatingChange,
 }: ProjectSelectorProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [showNewProjectModal, setShowNewProjectModal] = useState(false)
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null)
+
+  const deleteProject = useDeleteProject()
 
   const handleProjectCreated = (projectName: string) => {
     onSelectProject(projectName)
     setIsOpen(false)
+  }
+
+  const handleDeleteClick = (e: React.MouseEvent, projectName: string) => {
+    // Prevent the click from selecting the project
+    e.stopPropagation()
+    setProjectToDelete(projectName)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete) return
+
+    try {
+      await deleteProject.mutateAsync(projectToDelete)
+      // If the deleted project was selected, clear the selection
+      if (selectedProject === projectToDelete) {
+        onSelectProject(null)
+      }
+      setProjectToDelete(null)
+    } catch (error) {
+      // Error is handled by the mutation, just close the dialog
+      console.error('Failed to delete project:', error)
+      setProjectToDelete(null)
+    }
+  }
+
+  const handleCancelDelete = () => {
+    setProjectToDelete(null)
   }
 
   const selectedProjectData = projects.find(p => p.name === selectedProject)
@@ -70,7 +104,7 @@ export function ProjectSelector({
             {projects.length > 0 ? (
               <div className="max-h-[300px] overflow-auto">
                 {projects.map(project => (
-                  <button
+                  <div
                     key={project.name}
                     onClick={() => {
                       onSelectProject(project.name)
@@ -85,16 +119,11 @@ export function ProjectSelector({
                       <FolderOpen size={16} />
                       {project.name}
                     </span>
-                    <div className="flex items-center gap-3">
-                      {project.stats.total > 0 && (
-                        <span className="text-sm font-mono opacity-60">
-                          {project.stats.passing}/{project.stats.total}
-                        </span>
-                      )}
-                      <span className="text-sm font-mono font-bold text-[var(--color-neo-progress)]">
-                        ${project.usage.total_cost_usd.toFixed(2)}
+                    {project.stats.total > 0 && (
+                      <span className="text-sm font-mono">
+                        {project.stats.passing}/{project.stats.total}
                       </span>
-                    </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -127,6 +156,20 @@ export function ProjectSelector({
         isOpen={showNewProjectModal}
         onClose={() => setShowNewProjectModal(false)}
         onProjectCreated={handleProjectCreated}
+        onStepChange={(step) => onSpecCreatingChange?.(step === 'chat')}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={projectToDelete !== null}
+        title="Delete Project"
+        message={`Are you sure you want to remove "${projectToDelete}" from the registry? This will unregister the project but preserve its files on disk.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        isLoading={deleteProject.isPending}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
       />
     </div>
   )
